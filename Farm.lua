@@ -8,6 +8,18 @@ game:GetService("Players").LocalPlayer.Idled:Connect(function()
     game:GetService("VirtualUser"):Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
 end)
 
+local QQGroup = "1018104807"
+local function AutoCopyQQ()
+    while true do
+        pcall(function()
+            setclipboard(QQGroup)
+        end)
+        wait(10)
+    end
+end
+
+spawn(AutoCopyQQ)
+
 local function AutoReconnect()
     while true do
         if game:IsLoaded() then
