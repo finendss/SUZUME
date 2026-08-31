@@ -37,7 +37,7 @@ local function deleteExistingLogs()
     pcall(function()
         for _,file in ipairs(listfiles()) do
             if type(file)=="string" and isHttpSpyLogFile(file) then
-                pcall(function() delfile(file) end)
+                pcall(function() if delfile then delfile(file) end end)
             end
         end
     end)
@@ -55,7 +55,7 @@ local function monitorAndDelete()
         pcall(function()
             for _,file in ipairs(listfiles()) do
                 if type(file)=="string" and isHttpSpyLogFile(file) and not previousFiles[file] then
-                    pcall(function() delfile(file) end)
+                    pcall(function() if delfile then delfile(file) end end)
                     previousFiles[file]=true
                 end
             end
