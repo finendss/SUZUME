@@ -1,206 +1,151 @@
 --By芝士球工作室
+local placeId=game.PlaceId
 local function kickPlayer(reason)
-    local player=game:GetService("Players").LocalPlayer
-    if player then player:Kick(reason or "[芝士球Anti-Spy]检测到非法工具") end
+local player=game:GetService("Players").LocalPlayer
+if player then player:Kick(reason or "[芝士球Anti-Spy]检测到非法工具") end
 end
-
-local placeId = game.PlaceId
-
-local originalWritefile = writefile
-local originalAppendfile = appendfile
-local originalReadfile = readfile
-
+local originalWritefile=writefile
+local originalAppendfile=appendfile
+local originalReadfile=readfile
 local function isHttpSpyLogFile(path)
-    if type(path)~="string" then return false end
-    if path:match("^"..placeId.."%-%d+_%d+_%d+%-log%.txt$") then return true end
-    if path:find(placeId) and path:find("log") then return true end
-    if string.lower(path):find("http") and string.lower(path):find("log") then return true end
-    return false
+if type(path)~="string" then return false end
+if path:match("^"..placeId.."%-%d+_%d+_%d+%-log%.txt$") then return true end
+if path:find(placeId) and path:find("log") then return true end
+if string.lower(path):find("http") and string.lower(path):find("log") then return true end
+return false
 end
-
-local function getReplacementContent()
-    return "[芝士球Anti-HttpSpy] 此游戏受到保护，HttpSpy 已被拦截\n"..
-           "游戏ID: "..placeId.."\n"..
-           "拦截时间: "..os.date("%Y-%m-%d %H:%M:%S").."\n"..
-           string.rep("=",50).."\n"..
-           "原日志已被保护，无法查看任何抓包数据\n"..
-           string.rep("=",50).."\n"..
-           "[芝士球Anti-HttpSpy] 保护生效中"
-end
-
 if originalWritefile then
-    writefile = function(path, content)
-        if isHttpSpyLogFile(path) then
-            content = getReplacementContent()
-        end
-        return originalWritefile(path, content)
-    end
+writefile=function(path,content)
+if isHttpSpyLogFile(path) then return end
+return originalWritefile(path,content)
 end
-
+end
 if originalAppendfile then
-    appendfile = function(path, content)
-        if isHttpSpyLogFile(path) then
-            return
-        end
-        return originalAppendfile(path, content)
-    end
+appendfile=function(path,content)
+if isHttpSpyLogFile(path) then return end
+return originalAppendfile(path,content)
 end
-
+end
 if originalReadfile then
-    readfile = function(path)
-        if isHttpSpyLogFile(path) then
-            return getReplacementContent()
-        end
-        return originalReadfile(path)
-    end
+readfile=function(path)
+if isHttpSpyLogFile(path) then return "" end
+return originalReadfile(path)
 end
-
-local function overwriteExistingLogs()
-    if not listfiles then return end
-    pcall(function()
-        for _, file in ipairs(listfiles()) do
-            if type(file)=="string" and isHttpSpyLogFile(file) then
-                pcall(function() originalWritefile(file, getReplacementContent()) end)
-            end
-        end
-    end)
 end
-task.spawn(overwriteExistingLogs)
-
-local function isSuspicious(name)
-    if type(name)~="string" then return false end
-    local l=string.lower(name)
-    if l:find("spy") or l:find("http") or l:find("remote") or l:find("event") or l:find("hook") or l:find("ketamine") then return true end
-    if l:find("cspy") or l:find("rspy") or l:find("espy") or l:find("sniffer") or l:find("monitor") then return true end
-    if name:sub(1,2)=="__" then return true end
-    return false
+local function deleteExistingLogs()
+if not listfiles then return end
+pcall(function()
+for _,file in ipairs(listfiles()) do
+if type(file)=="string" and isHttpSpyLogFile(file) then
+pcall(function() delfile(file) end)
 end
-
-local function isFunctionHooked(func)
-    if not isfunctionhooked then return false end
-    if type(func)~="function" then return false end
-    return isfunctionhooked(func)
 end
-
-local function checkHookedFunctions()
-    local funcs={}
-    if syn and syn.request then table.insert(funcs, syn.request) end
-    if http and http.request then table.insert(funcs, http.request) end
-    if game and game.HttpGet then table.insert(funcs, game.HttpGet) end
-    if game and game.HttpPost then table.insert(funcs, game.HttpPost) end
-    if game and game.HttpGetAsync then table.insert(funcs, game.HttpGetAsync) end
-    if game and game.HttpPostAsync then table.insert(funcs, game.HttpPostAsync) end
-    for _,f in ipairs(funcs) do
-        if isFunctionHooked(f) then
-            kickPlayer("[芝士球Anti-Spy]检测到非法工具")
-        end
-    end
-    return false
+end)
 end
-
-local function detectNetworkInterception()
-    local testUrl="https://httpbin.org/get?test=1"
-    local success, response = pcall(function()
-        return (syn or http).request({Url=testUrl, Method="GET"})
-    end)
-    if success and response and response.Body then
-        if not string.find(response.Body, '"test":"1"') then
-            kickPlayer("[芝士球Anti-Spy]检测到非法工具")
-        end
-    end
-    return false
+local function monitorAndDelete()
+if not listfiles then return end
+local previousFiles={}
+pcall(function()
+for _,file in ipairs(listfiles()) do
+if type(file)=="string" then previousFiles[file]=true end
 end
-
-local function scanGuiStructure(gui)
-    if not gui then return false end
-    local found={MainFrame=0,TitleBar=0,CloseButton=0}
-    local function scan(obj,depth)
-        if depth>10 then return end
-        if obj.Name=="MainFrame" then found.MainFrame=found.MainFrame+1 end
-        if obj.Name=="TitleBar" then found.TitleBar=found.TitleBar+1 end
-        if obj.Name=="CloseButton" then found.CloseButton=found.CloseButton+1 end
-        for _,child in ipairs(obj:GetChildren()) do scan(child,depth+1) end
-    end
-    scan(gui,0)
-    if found.MainFrame>=1 and found.TitleBar>=1 and found.CloseButton>=1 then return true end
-    return false
+end)
+while true do
+task.wait(2)
+pcall(function()
+for _,file in ipairs(listfiles()) do
+if type(file)=="string" and isHttpSpyLogFile(file) and not previousFiles[file] then
+pcall(function() delfile(file) end)
+previousFiles[file]=true
 end
-
-local function detectGuiStructure()
-    local containers={}
-    local c=game:GetService("CoreGui") if c then table.insert(containers,c) end
-    local p=game:GetService("Players").LocalPlayer
-    if p then local pg=p:FindFirstChild("PlayerGui") if pg then table.insert(containers,pg) end end
-    if getfenv().gethui then local h=getfenv().gethui() if h and not table.find(containers,h) then table.insert(containers,h) end end
-    for _,container in ipairs(containers) do
-        for _,child in ipairs(container:GetChildren()) do
-            if child:IsA("ScreenGui") and scanGuiStructure(child) then
-                kickPlayer("[芝士球Anti-Spy]检测到非法工具")
-            end
-        end
-    end
-    return false
 end
-
-local function blockSpyGuiCreation()
-    local containers={}
-    local c=game:GetService("CoreGui") if c then table.insert(containers,c) end
-    local p=game:GetService("Players").LocalPlayer
-    if p then local pg=p:FindFirstChild("PlayerGui") if pg then table.insert(containers,pg) end end
-    if getfenv().gethui then local h=getfenv().gethui() if h and not table.find(containers,h) then table.insert(containers,h) end end
-    
-    for _,container in ipairs(containers) do
-        container.ChildAdded:Connect(function(child)
-            if child:IsA("ScreenGui") and isSuspicious(child.Name) then
-                pcall(function() child:Destroy() end)
-            end
-        end)
-        for _,child in ipairs(container:GetChildren()) do
-            if child:IsA("ScreenGui") and isSuspicious(child.Name) then
-                pcall(function() child:Destroy() end)
-            end
-        end
-    end
-    
-    pcall(function()
-        local oldNew = Instance.new
-        Instance.new = function(className, parent)
-            local instance = oldNew(className, parent)
-            if className == "ScreenGui" and instance and parent then
-                if isSuspicious(instance.Name) then
-                    pcall(function() task.wait(0.1) instance:Destroy() end)
-                end
-            end
-            return instance
-        end
-    end)
+end)
 end
-
+end
+task.spawn(deleteExistingLogs)
+task.spawn(monitorAndDelete)
+local SPY_VARIABLES={"HttpSpy","__KetamineShared","Ketamine","CSpy","RSpy","ESpy"}
+local function isExactSpyVariable(name)
+if type(name)~="string" then return false end
+for _,spy in ipairs(SPY_VARIABLES) do if name==spy then return true end end
+return false
+end
+local SPY_GUI_NAMES={"HttpSpyGui","Ketamine"}
+local function isSpyGuiName(name)
+if type(name)~="string" then return false end
+for _,gui in ipairs(SPY_GUI_NAMES) do if name==gui then return true end
+return false
+end
+local function fullScan()
 local envs={_G}
 if getgenv then local e=getgenv() if e and e~=_G then table.insert(envs,e) end end
 if getfenv then local e=getfenv() if e and e~=_G and e~=getgenv() then table.insert(envs,e) end end
-
+for _,env in ipairs(envs) do
+if type(env)=="table" then
+for key,_ in pairs(env) do
+if type(key)=="string" and isExactSpyVariable(key) then return true end
+end
+end
+end
+local containers={}
+local c=game:GetService("CoreGui") if c then table.insert(containers,c) end
+local p=game:GetService("Players").LocalPlayer
+if p then local pg=p:FindFirstChild("PlayerGui") if pg then table.insert(containers,pg) end end
+if getfenv().gethui then local h=getfenv().gethui() if h and not table.find(containers,h) then table.insert(containers,h) end end
+for _,container in ipairs(containers) do
+for _,child in ipairs(container:GetChildren()) do
+if child:IsA("ScreenGui") and isSpyGuiName(child.Name) then return true end
+end
+end
+if isfunctionhooked then
+local funcs={}
+if syn and syn.request then table.insert(funcs,syn.request) end
+if http and http.request then table.insert(funcs,http.request) end
+if game and game.HttpGet then table.insert(funcs,game.HttpGet) end
+if game and game.HttpPost then table.insert(funcs,game.HttpPost) end
+for _,f in ipairs(funcs) do
+if type(f)=="function" and isfunctionhooked(f) then return true end
+end
+end
+return false
+end
+if fullScan() then kickPlayer("[芝士球Anti-Spy]检测到非法工具") end
+local envs={_G}
+if getgenv then local e=getgenv() if e and e~=_G then table.insert(envs,e) end end
+if getfenv then local e=getfenv() if e and e~=_G and e~=getgenv() then table.insert(envs,e) end end
 local snapshots={}
 for i,e in ipairs(envs) do
-    local k={}
-    for key,_ in pairs(e) do if type(key)=="string" then k[key]=true end end
-    snapshots[i]=k
+local k={}
+for key,_ in pairs(e) do if type(key)=="string" then k[key]=true end end
+snapshots[i]=k
 end
-
-blockSpyGuiCreation()
-task.spawn(overwriteExistingLogs)
-
+local containers={}
+local c=game:GetService("CoreGui") if c then table.insert(containers,c) end
+local p=game:GetService("Players").LocalPlayer
+if p then local pg=p:FindFirstChild("PlayerGui") if pg then table.insert(containers,pg) end end
+if getfenv().gethui then local h=getfenv().gethui() if h and not table.find(containers,h) then table.insert(containers,h) end end
+local guiNames={}
+for _,container in ipairs(containers) do
+for _,child in ipairs(container:GetChildren()) do
+if child:IsA("ScreenGui") and child.Name then guiNames[child.Name]=true end
+end
+end
+for _,container in ipairs(containers) do
+container.ChildAdded:Connect(function(child)
+if child:IsA("ScreenGui") and child.Name and not guiNames[child.Name] and isSpyGuiName(child.Name) then
+kickPlayer("[芝士球Anti-Spy]检测到非法工具")
+end
+guiNames[child.Name]=true
+end)
+end
 while true do
-    if checkHookedFunctions() then end
-    if detectGuiStructure() then end
-    if detectNetworkInterception() then end
-    for i,e in ipairs(envs) do
-        local old=snapshots[i]
-        for key,_ in pairs(e) do
-            if type(key)=="string" and not old[key] and isSuspicious(key) then
-                kickPlayer("[芝士球Anti-Spy]检测到非法工具")
-            end
-        end
-    end
-    task.wait(1)
+for i,e in ipairs(envs) do
+local old=snapshots[i]
+for key,_ in pairs(e) do
+if type(key)=="string" and not old[key] and isExactSpyVariable(key) then
+kickPlayer("[芝士球Anti-Spy]检测到非法工具")
+end
+end
+end
+task.wait(1)
 end
