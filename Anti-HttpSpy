@@ -13,18 +13,34 @@ local function isHttpSpyLogFile(path)
     if string.lower(path):find("http") and string.lower(path):find("log") then return true end
     return false
 end
+local function getProtectedContent()
+    return "[芝士球Anti-HttpSpy] 此链接受到保护，HttpSpy 已被拦截\n游戏ID: "..placeId.."\n拦截时间: "..os.date("%Y-%m-%d %H:%M:%S").."\n日志已被保护，无法查看任何抓包数据"
+end
 if originalWritefile then
     writefile=function(path,content)
-        if isHttpSpyLogFile(path) then return end
+        if isHttpSpyLogFile(path) then
+            return originalWritefile(path, getProtectedContent())
+        end
         return originalWritefile(path,content)
     end
 end
 if originalAppendfile then
     appendfile=function(path,content)
-        if isHttpSpyLogFile(path) then return end
+        if isHttpSpyLogFile(path) then
+            return
+        end
         return originalAppendfile(path,content)
     end
 end
+local function overwriteExistingLog()
+    local logPath = placeId .. "-" .. os.date("%d_%m_%y") .. "-log.txt"
+    if originalWritefile then
+        pcall(function()
+            originalWritefile(logPath, getProtectedContent())
+        end)
+    end
+end
+task.spawn(overwriteExistingLog)
 local SPY_VARIABLES={"HttpSpy","__KetamineShared","Ketamine","CSpy","RSpy","ESpy"}
 local function isExactSpyVariable(name)
     if type(name)~="string" then return false end
